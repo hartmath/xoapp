@@ -1,0 +1,81 @@
+name: Build XO Advisor Android APK/AAB
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm install
+        
+    - name: Build web app
+      run: npm run build
+        
+    - name: Set up Capacitor
+      run: npx cap sync android
+        
+    - name: Set up Android SDK
+      uses: android-actions/setup-android@v3
+      
+    - name: Build APK
+      run: |
+        cd android
+        ./gradlew assembleRelease
+        
+    - name: Build AAB
+      run: |
+        cd android
+        ./gradlew bundleRelease
+        
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: xo-advisor-apk
+        path: android/app/build/outputs/apk/release/app-release.apk
+        
+    - name: Upload AAB
+      uses: actions/upload-artifact@v4
+      with:
+        name: xo-advisor-aab
+        path: android/app/build/outputs/bundle/release/app-release.aab
+        
+    - name: Create Release
+      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          android/app/build/outputs/apk/release/app-release.apk
+          android/app/build/outputs/bundle/release/app-release.aab
+        tag_name: v${{ github.run_number }}
+        name: XO Advisor v${{ github.run_number }}
+        body: |
+          🚀 XO Advisor Android Build
+          
+          **APK**: For direct installation on Android devices
+          **AAB**: For Google Play Store distribution
+          
+          Built with GitHub Actions on ${{ github.event.head_commit.timestamp }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
